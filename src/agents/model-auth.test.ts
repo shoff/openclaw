@@ -463,4 +463,57 @@ describe("getApiKeyForModel", () => {
       }
     }
   });
+
+  it("resolves Azure OpenAI API key from env", async () => {
+    const previousAzureKey = process.env.AZURE_OPENAI_API_KEY;
+
+    try {
+      process.env.AZURE_OPENAI_API_KEY = "azure-openai-test-key";
+
+      vi.resetModules();
+      const { resolveApiKeyForProvider } = await import("./model-auth.js");
+
+      const resolved = await resolveApiKeyForProvider({
+        provider: "azure-openai",
+        store: { version: 1, profiles: {} },
+      });
+      expect(resolved.apiKey).toBe("azure-openai-test-key");
+      expect(resolved.source).toContain("AZURE_OPENAI_API_KEY");
+    } finally {
+      if (previousAzureKey === undefined) {
+        delete process.env.AZURE_OPENAI_API_KEY;
+      } else {
+        process.env.AZURE_OPENAI_API_KEY = previousAzureKey;
+      }
+    }
+  });
+
+  it("throws when Azure OpenAI API key is missing", async () => {
+    const previousAzureKey = process.env.AZURE_OPENAI_API_KEY;
+
+    try {
+      delete process.env.AZURE_OPENAI_API_KEY;
+
+      vi.resetModules();
+      const { resolveApiKeyForProvider } = await import("./model-auth.js");
+
+      let error: unknown = null;
+      try {
+        await resolveApiKeyForProvider({
+          provider: "azure-openai",
+          store: { version: 1, profiles: {} },
+        });
+      } catch (err) {
+        error = err;
+      }
+
+      expect(String(error)).toContain('No API key found for provider "azure-openai".');
+    } finally {
+      if (previousAzureKey === undefined) {
+        delete process.env.AZURE_OPENAI_API_KEY;
+      } else {
+        process.env.AZURE_OPENAI_API_KEY = previousAzureKey;
+      }
+    }
+  });
 });

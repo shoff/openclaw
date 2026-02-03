@@ -1,6 +1,7 @@
 export type ModelApi =
   | "openai-completions"
   | "openai-responses"
+  | "azure-openai-responses"
   | "anthropic-messages"
   | "google-generative-ai"
   | "github-copilot"
@@ -31,6 +32,8 @@ export type ModelDefinitionConfig = {
   maxTokens: number;
   headers?: Record<string, string>;
   compat?: ModelCompatConfig;
+  /** Azure OpenAI deployment name for this specific model. */
+  azureDeploymentName?: string;
 };
 
 export type ModelProviderConfig = {
@@ -40,6 +43,10 @@ export type ModelProviderConfig = {
   api?: ModelApi;
   headers?: Record<string, string>;
   authHeader?: boolean;
+  /** Azure OpenAI deployment name (maps model ID to deployment). */
+  azureDeploymentName?: string;
+  /** Azure OpenAI API version (e.g., "2024-02-15-preview"). */
+  azureApiVersion?: string;
   models: ModelDefinitionConfig[];
 };
 

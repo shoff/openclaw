@@ -41,6 +41,40 @@ Model note: while any model is supported, I strongly recommend **Anthropic Pro/M
 - Models config + CLI: [Models](https://docs.openclaw.ai/concepts/models)
 - Auth profile rotation (OAuth vs API keys) + fallbacks: [Model failover](https://docs.openclaw.ai/concepts/model-failover)
 
+### Azure OpenAI / Azure AI Foundry
+
+OpenClaw supports Azure OpenAI deployments via the `azure-openai` provider:
+
+```json5
+{
+  models: {
+    providers: {
+      "azure-openai": {
+        baseUrl: "https://your-resource.openai.azure.com",
+        api: "azure-openai-responses",
+        azureApiVersion: "2024-02-15-preview",
+        models: [
+          {
+            id: "gpt-4o",
+            name: "GPT-4o",
+            azureDeploymentName: "my-gpt4o-deployment",  // Optional: maps model to deployment
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Or configure via environment variables:
+
+```bash
+export AZURE_OPENAI_API_KEY="your-api-key"
+export AZURE_OPENAI_BASE_URL="https://your-resource.openai.azure.com"
+```
+
+Provider aliases (`azure`, `azureopenai`) are normalized to `azure-openai`.
+
 ## Install (recommended)
 
 Runtime: **Node ≥22**.

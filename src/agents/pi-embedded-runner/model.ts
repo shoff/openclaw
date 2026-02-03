@@ -12,10 +12,17 @@ import {
   type ModelRegistry,
 } from "../pi-model-discovery.js";
 
-type InlineModelEntry = ModelDefinitionConfig & { provider: string; baseUrl?: string };
+type InlineModelEntry = ModelDefinitionConfig & {
+  provider: string;
+  baseUrl?: string;
+  azureDeploymentName?: string;
+  azureApiVersion?: string;
+};
 type InlineProviderConfig = {
   baseUrl?: string;
   api?: ModelDefinitionConfig["api"];
+  azureDeploymentName?: string;
+  azureApiVersion?: string;
   models?: ModelDefinitionConfig[];
 };
 
@@ -32,6 +39,9 @@ export function buildInlineProviderModels(
       provider: trimmed,
       baseUrl: entry?.baseUrl,
       api: model.api ?? entry?.api,
+      // Azure-specific: model-level deployment overrides provider-level
+      azureDeploymentName: model.azureDeploymentName ?? entry?.azureDeploymentName,
+      azureApiVersion: entry?.azureApiVersion,
     }));
   });
 }
@@ -87,10 +97,13 @@ export function resolveModel(
     }
     const providerCfg = providers[provider];
     if (providerCfg || modelId.startsWith("mock-")) {
+      // Determine if this is an Azure provider and set appropriate API type
+      const isAzureProvider = normalizedProvider === "azure-openai";
+      const defaultApi = isAzureProvider ? "azure-openai-responses" : "openai-responses";
       const fallbackModel: Model<Api> = normalizeModelCompat({
         id: modelId,
         name: modelId,
-        api: providerCfg?.api ?? "openai-responses",
+        api: providerCfg?.api ?? defaultApi,
         provider,
         baseUrl: providerCfg?.baseUrl,
         reasoning: false,
@@ -98,6 +111,13 @@ export function resolveModel(
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: providerCfg?.models?.[0]?.contextWindow ?? DEFAULT_CONTEXT_TOKENS,
         maxTokens: providerCfg?.models?.[0]?.maxTokens ?? DEFAULT_CONTEXT_TOKENS,
+        // Azure-specific fields
+        ...(isAzureProvider && providerCfg?.azureDeploymentName
+          ? { azureDeploymentName: providerCfg.azureDeploymentName }
+          : {}),
+        ...(isAzureProvider && providerCfg?.azureApiVersion
+          ? { azureApiVersion: providerCfg.azureApiVersion }
+          : {}),
       } as Model<Api>);
       return { model: fallbackModel, authStorage, modelRegistry };
     }

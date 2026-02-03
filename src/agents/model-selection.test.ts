@@ -19,6 +19,15 @@ describe("model-selection", () => {
       expect(normalizeProviderId("qwen")).toBe("qwen-portal");
       expect(normalizeProviderId("kimi-code")).toBe("kimi-coding");
     });
+
+    it("should normalize Azure provider names", () => {
+      expect(normalizeProviderId("azure")).toBe("azure-openai");
+      expect(normalizeProviderId("Azure")).toBe("azure-openai");
+      expect(normalizeProviderId("azureopenai")).toBe("azure-openai");
+      expect(normalizeProviderId("AzureOpenAI")).toBe("azure-openai");
+      expect(normalizeProviderId("azure-openai-responses")).toBe("azure-openai");
+      expect(normalizeProviderId("azure-openai")).toBe("azure-openai");
+    });
   });
 
   describe("parseModelRef", () => {

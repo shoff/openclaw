@@ -127,4 +127,84 @@ describe("resolveModel", () => {
     expect(result.model?.provider).toBe("custom");
     expect(result.model?.id).toBe("missing-model");
   });
+
+  it("defaults azure-openai provider to azure-openai-responses api", () => {
+    const cfg = {
+      models: {
+        providers: {
+          "azure-openai": {
+            baseUrl: "https://myresource.openai.azure.com",
+            models: [],
+          },
+        },
+      },
+    } as OpenClawConfig;
+
+    const result = resolveModel("azure-openai", "gpt-4o", "/tmp/agent", cfg);
+
+    expect(result.model?.api).toBe("azure-openai-responses");
+    expect(result.model?.baseUrl).toBe("https://myresource.openai.azure.com");
+    expect(result.model?.provider).toBe("azure-openai");
+  });
+
+  it("includes azure-specific fields in fallback model", () => {
+    const cfg = {
+      models: {
+        providers: {
+          "azure-openai": {
+            baseUrl: "https://myresource.openai.azure.com",
+            azureDeploymentName: "my-gpt4o-deployment",
+            azureApiVersion: "2024-02-15-preview",
+            models: [],
+          },
+        },
+      },
+    } as OpenClawConfig;
+
+    const result = resolveModel("azure-openai", "gpt-4o", "/tmp/agent", cfg);
+
+    expect(result.model?.api).toBe("azure-openai-responses");
+    expect((result.model as Record<string, unknown>)?.azureDeploymentName).toBe(
+      "my-gpt4o-deployment",
+    );
+    expect((result.model as Record<string, unknown>)?.azureApiVersion).toBe("2024-02-15-preview");
+  });
+});
+
+describe("buildInlineProviderModels - Azure support", () => {
+  it("inherits azure-specific fields from provider config", () => {
+    const providers = {
+      "azure-openai": {
+        baseUrl: "https://myresource.openai.azure.com",
+        api: "azure-openai-responses",
+        azureDeploymentName: "my-deployment",
+        azureApiVersion: "2024-02-15-preview",
+        models: [makeModel("gpt-4o")],
+      },
+    };
+
+    const result = buildInlineProviderModels(providers as never);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].azureDeploymentName).toBe("my-deployment");
+    expect(result[0].azureApiVersion).toBe("2024-02-15-preview");
+  });
+
+  it("model-level azureDeploymentName takes precedence over provider-level", () => {
+    const providers = {
+      "azure-openai": {
+        baseUrl: "https://myresource.openai.azure.com",
+        api: "azure-openai-responses",
+        azureDeploymentName: "provider-deployment",
+        azureApiVersion: "2024-02-15-preview",
+        models: [{ ...makeModel("gpt-4o"), azureDeploymentName: "model-deployment" }],
+      },
+    };
+
+    const result = buildInlineProviderModels(providers as never);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].azureDeploymentName).toBe("model-deployment");
+    expect(result[0].azureApiVersion).toBe("2024-02-15-preview");
+  });
 });

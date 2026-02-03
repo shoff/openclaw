@@ -4,6 +4,7 @@ import { isSafeExecutableValue } from "../infra/exec-safety.js";
 export const ModelApiSchema = z.union([
   z.literal("openai-completions"),
   z.literal("openai-responses"),
+  z.literal("azure-openai-responses"),
   z.literal("anthropic-messages"),
   z.literal("google-generative-ai"),
   z.literal("github-copilot"),
@@ -42,6 +43,7 @@ export const ModelDefinitionSchema = z
     maxTokens: z.number().positive().optional(),
     headers: z.record(z.string(), z.string()).optional(),
     compat: ModelCompatSchema,
+    azureDeploymentName: z.string().optional(),
   })
   .strict();
 
@@ -55,6 +57,8 @@ export const ModelProviderSchema = z
     api: ModelApiSchema.optional(),
     headers: z.record(z.string(), z.string()).optional(),
     authHeader: z.boolean().optional(),
+    azureDeploymentName: z.string().optional(),
+    azureApiVersion: z.string().optional(),
     models: z.array(ModelDefinitionSchema),
   })
   .strict();
