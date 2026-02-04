@@ -457,6 +457,102 @@ export function applyVeniceConfig(cfg: OpenClawConfig): OpenClawConfig {
   };
 }
 
+export function applyAzureOpenaiProviderConfig(
+  cfg: OpenClawConfig,
+  baseUrl?: string,
+): OpenClawConfig {
+  const providers = { ...cfg.models?.providers };
+  const existingProvider = providers["azure-openai"];
+  const existingModels = Array.isArray(existingProvider?.models) ? existingProvider.models : [];
+
+  // Default model definition for Azure OpenAI (GPT-4o)
+  // Costs are approximate for Azure OpenAI (per million tokens in USD)
+  const defaultModel = {
+    id: "gpt-4o",
+    name: "GPT-4o",
+    reasoning: false,
+    input: ["text", "image"] as Array<"text" | "image">,
+    cost: {
+      input: 2.5,
+      output: 10,
+      cacheRead: 1.25,
+      cacheWrite: 3.125,
+    },
+    contextWindow: 128000,
+    maxTokens: 16384,
+  };
+
+  const hasDefaultModel = existingModels.some((model) => model.id === defaultModel.id);
+  const mergedModels = hasDefaultModel ? existingModels : [...existingModels, defaultModel];
+
+  const { apiKey: existingApiKey, ...existingProviderRest } = (existingProvider ?? {}) as Record<
+    string,
+    unknown
+  > as { apiKey?: string; baseUrl?: string };
+
+  const resolvedApiKey = typeof existingApiKey === "string" ? existingApiKey : undefined;
+  const normalizedApiKey = resolvedApiKey?.trim();
+  const resolvedBaseUrl =
+    baseUrl ??
+    (existingProvider as { baseUrl?: string })?.baseUrl ??
+    "https://YOUR_RESOURCE.openai.azure.com";
+
+  providers["azure-openai"] = {
+    ...existingProviderRest,
+    baseUrl: resolvedBaseUrl,
+    api: "azure-openai-responses",
+    azureApiVersion: "2024-02-15-preview",
+    ...(normalizedApiKey ? { apiKey: normalizedApiKey } : {}),
+    models: mergedModels.length > 0 ? mergedModels : [defaultModel],
+  };
+
+  const models = { ...cfg.agents?.defaults?.models };
+  const azureModelRef = "azure-openai/gpt-4o";
+  models[azureModelRef] = {
+    ...models[azureModelRef],
+    alias: models[azureModelRef]?.alias ?? "Azure GPT-4o",
+  };
+
+  return {
+    ...cfg,
+    agents: {
+      ...cfg.agents,
+      defaults: {
+        ...cfg.agents?.defaults,
+        models,
+      },
+    },
+    models: {
+      mode: cfg.models?.mode ?? "merge",
+      providers,
+    },
+  };
+}
+
+export function applyAzureOpenaiConfig(cfg: OpenClawConfig, baseUrl?: string): OpenClawConfig {
+  const next = applyAzureOpenaiProviderConfig(cfg, baseUrl);
+  const existingModel = next.agents?.defaults?.model;
+  const azureModelRef = "azure-openai/gpt-4o";
+
+  return {
+    ...next,
+    agents: {
+      ...next.agents,
+      defaults: {
+        ...next.agents?.defaults,
+        model: {
+          ...(existingModel && "fallbacks" in (existingModel as Record<string, unknown>)
+            ? {
+                fallbacks: (existingModel as { fallbacks?: string[] }).fallbacks,
+              }
+            : undefined),
+          primary: azureModelRef,
+        },
+      },
+    },
+  };
+}
+
 export function applyAuthProfileConfig(
   cfg: OpenClawConfig,
   params: {

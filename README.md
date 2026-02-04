@@ -57,12 +57,12 @@ OpenClaw supports Azure OpenAI deployments via the `azure-openai` provider:
           {
             id: "gpt-4o",
             name: "GPT-4o",
-            azureDeploymentName: "my-gpt4o-deployment",  // Optional: maps model to deployment
-          }
-        ]
-      }
-    }
-  }
+            azureDeploymentName: "my-gpt4o-deployment", // Optional: maps model to deployment
+          },
+        ],
+      },
+    },
+  },
 }
 ```
 

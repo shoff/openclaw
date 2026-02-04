@@ -178,3 +178,17 @@ export async function setOpencodeZenApiKey(key: string, agentDir?: string) {
     agentDir: resolveAuthAgentDir(agentDir),
   });
 }
+
+export async function setAzureOpenaiApiKey(key: string, agentDir?: string) {
+  upsertAuthProfile({
+    profileId: "azure-openai:default",
+    credential: {
+      type: "api_key",
+      provider: "azure-openai",
+      key,
+    },
+    agentDir: resolveAuthAgentDir(agentDir),
+  });
+}
+
+export const AZURE_OPENAI_DEFAULT_MODEL_REF = "azure-openai/gpt-4o";

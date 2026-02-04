@@ -13,6 +13,8 @@ import {
 } from "./google-gemini-model-default.js";
 import {
   applyAuthProfileConfig,
+  applyAzureOpenaiConfig,
+  applyAzureOpenaiProviderConfig,
   applyKimiCodeConfig,
   applyKimiCodeProviderConfig,
   applyMoonshotConfig,
@@ -30,6 +32,7 @@ import {
   applyXiaomiConfig,
   applyXiaomiProviderConfig,
   applyZaiConfig,
+  AZURE_OPENAI_DEFAULT_MODEL_REF,
   KIMI_CODING_MODEL_REF,
   MOONSHOT_DEFAULT_MODEL_REF,
   OPENROUTER_DEFAULT_MODEL_REF,
@@ -37,6 +40,7 @@ import {
   VENICE_DEFAULT_MODEL_REF,
   VERCEL_AI_GATEWAY_DEFAULT_MODEL_REF,
   XIAOMI_DEFAULT_MODEL_REF,
+  setAzureOpenaiApiKey,
   setGeminiApiKey,
   setKimiCodingApiKey,
   setMoonshotApiKey,
@@ -96,6 +100,11 @@ export async function applyAuthChoiceApiProviders(
       authChoice = "venice-api-key";
     } else if (params.opts.tokenProvider === "opencode") {
       authChoice = "opencode-zen";
+    } else if (
+      params.opts.tokenProvider === "azure-openai" ||
+      params.opts.tokenProvider === "azure"
+    ) {
+      authChoice = "azure-openai-api-key";
     }
   }
 
@@ -634,6 +643,108 @@ export async function applyAuthChoiceApiProviders(
         applyDefaultConfig: applyOpencodeZenConfig,
         applyProviderConfig: applyOpencodeZenProviderConfig,
         noteDefault: OPENCODE_ZEN_DEFAULT_MODEL,
+        noteAgentModel,
+        prompter: params.prompter,
+      });
+      nextConfig = applied.config;
+      agentModelOverride = applied.agentModelOverride ?? agentModelOverride;
+    }
+    return { config: nextConfig, agentModelOverride };
+  }
+
+  if (authChoice === "azure-openai-api-key") {
+    let hasCredential = false;
+    const tokenProvider = params.opts?.tokenProvider?.trim().toLowerCase();
+
+    if (
+      !hasCredential &&
+      params.opts?.token &&
+      (tokenProvider === "azure-openai" || tokenProvider === "azure")
+    ) {
+      await setAzureOpenaiApiKey(normalizeApiKeyInput(params.opts.token), params.agentDir);
+      hasCredential = true;
+    }
+
+    if (!hasCredential) {
+      await params.prompter.note(
+        [
+          "Azure OpenAI requires:",
+          "1. Azure OpenAI API key",
+          "2. Azure resource base URL (e.g., https://your-resource.openai.azure.com)",
+          "",
+          "Get your credentials from the Azure Portal:",
+          "https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub/~/OpenAI",
+        ].join("\n"),
+        "Azure OpenAI",
+      );
+    }
+
+    const envKey = resolveEnvApiKey("azure-openai");
+    if (envKey) {
+      const useExisting = await params.prompter.confirm({
+        message: `Use existing AZURE_OPENAI_API_KEY (${envKey.source}, ${formatApiKeyPreview(envKey.apiKey)})?`,
+        initialValue: true,
+      });
+      if (useExisting) {
+        await setAzureOpenaiApiKey(envKey.apiKey, params.agentDir);
+        hasCredential = true;
+      }
+    }
+
+    if (!hasCredential) {
+      const key = await params.prompter.text({
+        message: "Enter Azure OpenAI API key",
+        validate: validateApiKeyInput,
+      });
+      await setAzureOpenaiApiKey(normalizeApiKeyInput(String(key)), params.agentDir);
+    }
+
+    // Prompt for base URL
+    const envBaseUrl = process.env.AZURE_OPENAI_BASE_URL?.trim();
+    let baseUrl: string | undefined;
+
+    if (envBaseUrl) {
+      const useExistingBaseUrl = await params.prompter.confirm({
+        message: `Use existing AZURE_OPENAI_BASE_URL (${envBaseUrl})?`,
+        initialValue: true,
+      });
+      if (useExistingBaseUrl) {
+        baseUrl = envBaseUrl;
+      }
+    }
+
+    if (!baseUrl) {
+      const baseUrlInput = await params.prompter.text({
+        message: "Enter Azure OpenAI base URL (e.g., https://your-resource.openai.azure.com)",
+        validate: (value) => {
+          if (!value?.trim()) {
+            return "Base URL is required";
+          }
+          try {
+            new URL(String(value).trim());
+            return undefined;
+          } catch {
+            return "Invalid URL format";
+          }
+        },
+      });
+      baseUrl = String(baseUrlInput).trim();
+    }
+
+    nextConfig = applyAuthProfileConfig(nextConfig, {
+      profileId: "azure-openai:default",
+      provider: "azure-openai",
+      mode: "api_key",
+    });
+
+    {
+      const applied = await applyDefaultModelChoice({
+        config: nextConfig,
+        setDefaultModel: params.setDefaultModel,
+        defaultModel: AZURE_OPENAI_DEFAULT_MODEL_REF,
+        applyDefaultConfig: (cfg) => applyAzureOpenaiConfig(cfg, baseUrl),
+        applyProviderConfig: (cfg) => applyAzureOpenaiProviderConfig(cfg, baseUrl),
+        noteDefault: AZURE_OPENAI_DEFAULT_MODEL_REF,
         noteAgentModel,
         prompter: params.prompter,
       });
