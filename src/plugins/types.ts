@@ -331,6 +331,18 @@ export type PluginHookAgentEndEvent = {
 export type PluginHookBeforeCompactionEvent = {
   messageCount: number;
   tokenCount?: number;
+  /** Raw messages being compacted (when available from the extension bridge). */
+  messages?: unknown[];
+};
+
+export type PluginHookBeforeCompactionResult = {
+  /**
+   * If true, cancel compaction entirely.
+   * The session will continue with the current context.
+   * Use in combination with runtime.session.reset() to replace
+   * compaction with a clean session reset.
+   */
+  cancel?: boolean;
 };
 
 export type PluginHookAfterCompactionEvent = {
@@ -470,7 +482,7 @@ export type PluginHookHandlerMap = {
   before_compaction: (
     event: PluginHookBeforeCompactionEvent,
     ctx: PluginHookAgentContext,
-  ) => Promise<void> | void;
+  ) => Promise<PluginHookBeforeCompactionResult | void> | PluginHookBeforeCompactionResult | void;
   after_compaction: (
     event: PluginHookAfterCompactionEvent,
     ctx: PluginHookAgentContext,

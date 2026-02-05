@@ -9,6 +9,7 @@ import { setCompactionSafeguardRuntime } from "../pi-extensions/compaction-safeg
 import { setContextPruningRuntime } from "../pi-extensions/context-pruning/runtime.js";
 import { computeEffectiveSettings } from "../pi-extensions/context-pruning/settings.js";
 import { makeToolPrunablePredicate } from "../pi-extensions/context-pruning/tools.js";
+import { setPluginCompactionBridgeSessionKey } from "../pi-extensions/plugin-compaction-bridge.js";
 import { ensurePiCompactionReserveTokens } from "../pi-settings.js";
 import { isCacheTtlEligibleProvider, readLastCacheTtlTimestamp } from "./cache-ttl.js";
 
@@ -77,8 +78,16 @@ export function buildEmbeddedExtensionPaths(params: {
   provider: string;
   modelId: string;
   model: Model<Api> | undefined;
+  /** Session key for plugin hook context (passed to compaction bridge). */
+  sessionKey?: string;
 }): string[] {
   const paths: string[] = [];
+
+  // Always load the plugin compaction bridge so that plugin before_compaction
+  // and after_compaction hooks are wired into the pi-coding-agent extension system.
+  setPluginCompactionBridgeSessionKey(params.sessionKey);
+  paths.push(resolvePiExtensionPath("plugin-compaction-bridge"));
+
   if (resolveCompactionMode(params.cfg) === "safeguard") {
     const compactionCfg = params.cfg?.agents?.defaults?.compaction;
     const contextWindowInfo = resolveContextWindowInfo({

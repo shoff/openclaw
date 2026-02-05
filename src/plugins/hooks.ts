@@ -14,6 +14,7 @@ import type {
   PluginHookBeforeAgentStartEvent,
   PluginHookBeforeAgentStartResult,
   PluginHookBeforeCompactionEvent,
+  PluginHookBeforeCompactionResult,
   PluginHookBeforeToolCallEvent,
   PluginHookBeforeToolCallResult,
   PluginHookGatewayContext,
@@ -42,6 +43,7 @@ export type {
   PluginHookBeforeAgentStartResult,
   PluginHookAgentEndEvent,
   PluginHookBeforeCompactionEvent,
+  PluginHookBeforeCompactionResult,
   PluginHookAfterCompactionEvent,
   PluginHookMessageContext,
   PluginHookMessageReceivedEvent,
@@ -212,12 +214,21 @@ export function createHookRunner(registry: PluginRegistry, options: HookRunnerOp
 
   /**
    * Run before_compaction hook.
+   * Allows plugins to cancel compaction by returning { cancel: true }.
+   * Runs sequentially so cancellation is respected.
    */
   async function runBeforeCompaction(
     event: PluginHookBeforeCompactionEvent,
     ctx: PluginHookAgentContext,
-  ): Promise<void> {
-    return runVoidHook("before_compaction", event, ctx);
+  ): Promise<PluginHookBeforeCompactionResult | undefined> {
+    return runModifyingHook<"before_compaction", PluginHookBeforeCompactionResult>(
+      "before_compaction",
+      event,
+      ctx,
+      (acc, next) => ({
+        cancel: next.cancel ?? acc?.cancel,
+      }),
+    );
   }
 
   /**

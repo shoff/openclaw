@@ -248,6 +248,17 @@ export type PluginRuntime = {
       recordSessionMetaFromInbound: RecordSessionMetaFromInbound;
       recordInboundSession: RecordInboundSession;
       updateLastRoute: UpdateLastRoute;
+      /**
+       * Reset a session by creating a new sessionId while preserving settings.
+       * Equivalent to the /new command or sessions.reset gateway method.
+       * Returns the new session entry.
+       */
+      resetSession: (sessionKey: string) => Promise<{
+        ok: boolean;
+        key: string;
+        sessionId?: string;
+        error?: string;
+      }>;
     };
     mentions: {
       buildMentionRegexes: BuildMentionRegexes;

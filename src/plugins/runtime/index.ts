@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
+import type { SessionEntry } from "../../config/sessions/types.js";
 import type { PluginRuntime } from "./types.js";
 import { resolveEffectiveMessagesConfig, resolveHumanDelayConfig } from "../../agents/identity.js";
 import { createMemoryGetTool, createMemorySearchTool } from "../../agents/tools/memory-tool.js";
@@ -57,8 +59,10 @@ import {
   readSessionUpdatedAt,
   recordSessionMetaFromInbound,
   resolveStorePath,
+  snapshotSessionOrigin,
   updateLastRoute,
 } from "../../config/sessions.js";
+import { loadSessionStore, updateSessionStore } from "../../config/sessions/store.js";
 import { auditDiscordChannelPermissions } from "../../discord/audit.js";
 import {
   listDiscordDirectoryGroupsLive,
@@ -69,6 +73,7 @@ import { probeDiscord } from "../../discord/probe.js";
 import { resolveDiscordChannelAllowlist } from "../../discord/resolve-channels.js";
 import { resolveDiscordUserAllowlist } from "../../discord/resolve-users.js";
 import { sendMessageDiscord, sendPollDiscord } from "../../discord/send.js";
+import { resolveGatewaySessionStoreTarget } from "../../gateway/session-utils.js";
 import { shouldLogVerbose } from "../../globals.js";
 import { monitorIMessageProvider } from "../../imessage/monitor.js";
 import { probeIMessage } from "../../imessage/probe.js";
@@ -236,6 +241,57 @@ export function createPluginRuntime(): PluginRuntime {
         recordSessionMetaFromInbound,
         recordInboundSession,
         updateLastRoute,
+        resetSession: async (sessionKey: string) => {
+          try {
+            const cfg = loadConfig();
+            const target = resolveGatewaySessionStoreTarget({ cfg, key: sessionKey });
+            const storePath = target.storePath;
+            const next = await updateSessionStore(storePath, (store) => {
+              const primaryKey = target.storeKeys[0] ?? sessionKey;
+              const existingKey = target.storeKeys.find((candidate) => store[candidate]);
+              if (existingKey && existingKey !== primaryKey && !store[primaryKey]) {
+                store[primaryKey] = store[existingKey];
+                delete store[existingKey];
+              }
+              const entry = store[primaryKey];
+              const now = Date.now();
+              const nextEntry: SessionEntry = {
+                sessionId: randomUUID(),
+                updatedAt: now,
+                systemSent: false,
+                abortedLastRun: false,
+                thinkingLevel: entry?.thinkingLevel,
+                verboseLevel: entry?.verboseLevel,
+                reasoningLevel: entry?.reasoningLevel,
+                responseUsage: entry?.responseUsage,
+                model: entry?.model,
+                contextTokens: entry?.contextTokens,
+                sendPolicy: entry?.sendPolicy,
+                label: entry?.label,
+                origin: snapshotSessionOrigin(entry),
+                lastChannel: entry?.lastChannel,
+                lastTo: entry?.lastTo,
+                skillsSnapshot: entry?.skillsSnapshot,
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+              };
+              store[primaryKey] = nextEntry;
+              return nextEntry;
+            });
+            return {
+              ok: true,
+              key: target.canonicalKey,
+              sessionId: (next as SessionEntry)?.sessionId,
+            };
+          } catch (err) {
+            return {
+              ok: false,
+              key: sessionKey,
+              error: err instanceof Error ? err.message : String(err),
+            };
+          }
+        },
       },
       mentions: {
         buildMentionRegexes,
