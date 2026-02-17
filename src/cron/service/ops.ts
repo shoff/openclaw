@@ -202,11 +202,13 @@ export async function run(state: CronServiceState, id: string, mode?: "due" | "f
       return { ok: true, ran: false, reason: "already-running" as const };
     }
     const now = state.deps.nowMs();
-    const due = isJobDue(job, now, { forced: mode === "force" });
+    // Default to force when manually triggered — if you call run(), you want it to run.
+    const effectiveMode = mode ?? "force";
+    const due = isJobDue(job, now, { forced: effectiveMode === "force" });
     if (!due) {
       return { ok: true, ran: false, reason: "not-due" as const };
     }
-    await executeJob(state, job, now, { forced: mode === "force" });
+    await executeJob(state, job, now, { forced: effectiveMode === "force" });
     recomputeNextRuns(state);
     await persist(state);
     armTimer(state);
